@@ -4,7 +4,7 @@ import smtplib
 import ssl
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 import argparse
 import requests
@@ -59,8 +59,19 @@ def fetch_papers_for_date(date_str):
         })
     return papers
 
+def resolve_tz(tz_name):
+    try:
+        return ZoneInfo(tz_name)
+    except Exception:
+        n = (tz_name or "").lower()
+        if n in ("asia/shanghai", "asia/beijing", "prc", "ctt", "china"):
+            return timezone(timedelta(hours=8))
+        if n in ("utc", "gmt", "z"):
+            return timezone.utc
+        return timezone(timedelta(hours=0))
+
 def get_daily_papers_with_fallback(tz_name, max_days_back=3):
-    tz = ZoneInfo(tz_name)
+    tz = resolve_tz(tz_name)
     today = datetime.now(tz).date()
     for i in range(0, max_days_back + 1):
         d = today - timedelta(days=i)
@@ -176,7 +187,7 @@ def main():
     args = parser.parse_args()
 
     if args.test:
-        now = datetime.now(ZoneInfo(args.timezone))
+        now = datetime.now(resolve_tz(args.timezone))
         date_str = now.strftime("%Y-%m-%d %H:%M:%S %Z")
         subject = f"{args.subject_prefix}服务启动测试 - {date_str}".strip()
         html = (
