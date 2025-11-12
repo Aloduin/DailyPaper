@@ -46,6 +46,21 @@ def fetch_papers_for_date(date_str):
         else:
             authors_str = ""
         abstract = obj.get("abstract") or obj.get("summary") or obj.get("description") or ""
+        venue = obj.get("venue") or obj.get("publisher") or obj.get("conference") or obj.get("journal") or obj.get("source") or ""
+        institutions = obj.get("institutions") or obj.get("affiliations")
+        if not venue and institutions:
+            if isinstance(institutions, list):
+                inst_names = []
+                for inst in institutions:
+                    if isinstance(inst, dict):
+                        nm = inst.get("name") or inst.get("institution") or inst.get("org")
+                        if nm:
+                            inst_names.append(nm)
+                    elif isinstance(inst, str):
+                        inst_names.append(inst)
+                venue = ", ".join(inst_names)
+            elif isinstance(institutions, dict):
+                venue = institutions.get("name") or institutions.get("institution") or institutions.get("org") or ""
         url = obj.get("url") or obj.get("paperUrl") or obj.get("arxivUrl")
         if not url:
             pid = obj.get("id") or obj.get("paperId")
@@ -55,6 +70,7 @@ def fetch_papers_for_date(date_str):
             "title": title,
             "authors": authors_str,
             "abstract": abstract,
+            "institution": venue,
             "url": url or ""
         })
     return papers
@@ -89,13 +105,16 @@ def build_email_html(date_str, papers):
         ".badge{background:#2f81f7;color:#fff;font-weight:600;border-radius:999px;padding:4px 10px;font-size:12px;}"
         ".title{margin:0;font-size:22px;line-height:1.3;}"
         ".subtitle{margin:4px 0 0 0;color:#57606a;font-size:13px;}"
-        ".card{background:#fff;border:1px solid #d0d7de;border-radius:10px;padding:16px;margin:12px 0;box-shadow:0 1px 0 rgba(27,31,36,.04);}"
-        ".paper-title{margin:0 0 8px;font-size:16px;color:#0969da;text-decoration:none;}"
+        ".card{background:#fff;border:1px solid #d0d7de;border-radius:12px;padding:18px 16px;margin:14px 0;box-shadow:0 2px 6px rgba(27,31,36,.06);}"
+        ".card-bar{height:3px;background:linear-gradient(90deg,#2f81f7,#7ee787);border-radius:3px;margin:-18px -16px 12px;}"
+        ".paper-head{display:flex;align-items:flex-start;gap:8px;justify-content:space-between;margin-bottom:8px;}"
+        ".paper-title{margin:0;font-size:17px;color:#0969da;text-decoration:none;}"
         ".paper-title:hover{text-decoration:underline;}"
+        ".chip{background:#e7f3ff;color:#1756a9;border:1px solid #b6dbff;border-radius:999px;padding:4px 10px;font-size:12px;white-space:nowrap;}"
         ".meta{color:#57606a;font-size:13px;margin-bottom:8px;}"
-        ".abstract{font-size:14px;line-height:1.55;color:#24292e;}"
+        ".abstract{font-size:14px;line-height:1.6;color:#24292e;}"
         ".footer{margin-top:24px;color:#57606a;font-size:12px;}"
-        ".empty{background:#fff; border:1px dashed #d0d7de; border-radius:10px; padding:20px; text-align:center; color:#57606a;}"
+        ".empty{background:#fff; border:1px dashed #d0d7de; border-radius:12px; padding:22px; text-align:center; color:#57606a;}"
     )
     parts = []
     for p in papers:
@@ -103,9 +122,11 @@ def build_email_html(date_str, papers):
         title = p.get("title") or ""
         authors = p.get("authors") or ""
         abstract = p.get("abstract") or ""
+        institution = p.get("institution") or ""
         title_html = f"<a class=\"paper-title\" href=\"{link}\" target=\"_blank\">{title}</a>" if link else f"<div class=\"paper-title\">{title}</div>"
+        chip_html = f"<span class=\"chip\">{institution}</span>" if institution else ""
         parts.append(
-            f"<div class=\"card\">{title_html}<div class=\"meta\">{authors}</div><div class=\"abstract\">{abstract}</div></div>"
+            f"<div class=\"card\"><div class=\"card-bar\"></div><div class=\"paper-head\"><div>{title_html}</div><div>{chip_html}</div></div><div class=\"meta\">{authors}</div><div class=\"abstract\">{abstract}</div></div>"
         )
     body = (
         f"<div class=\"empty\">{date_str} 暂无可用的 Daily Papers。</div>" if not parts else "".join(parts)
@@ -132,10 +153,13 @@ def build_email_text(date_str, papers):
             title = p.get("title") or ""
             authors = p.get("authors") or ""
             abstract = p.get("abstract") or ""
+            institution = p.get("institution") or ""
             url = p.get("url") or ""
             lines.append(f"- {title}")
             if authors:
                 lines.append(f"  作者: {authors}")
+            if institution:
+                lines.append(f"  机构/发布: {institution}")
             if abstract:
                 lines.append(f"  摘要: {abstract}")
             if url:
