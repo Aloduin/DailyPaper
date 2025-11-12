@@ -1,0 +1,78 @@
+name: Daily Hugging Face Papers Email
+
+on:
+  schedule:
+    - cron: '30 1 * * *'
+  workflow_dispatch:
+    inputs:
+      test:
+        description: '启动测试邮件'
+        type: boolean
+        required: false
+        default: false
+      date:
+        description: '指定日期（YYYY-MM-DD）'
+        type: string
+        required: false
+      timezone:
+        description: '时区，例如 Asia/Shanghai'
+        type: string
+        required: false
+        default: 'Asia/Shanghai'
+      subject_prefix:
+        description: '邮件主题前缀'
+        type: string
+        required: false
+      max_days_back:
+        description: '最多回退查询天数'
+        type: number
+        required: false
+        default: 3
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    env:
+      TIMEZONE: 'Asia/Shanghai'
+      SUBJECT_PREFIX: '[HF日报] '
+      MAX_DAYS_BACK: 3
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+            python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+      - name: Send startup test email (optional)
+        if: ${{ inputs.test == true }}
+        env:
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          MAIL_FROM: ${{ secrets.MAIL_FROM }}
+          MAIL_TO: ${{ secrets.MAIL_TO }}
+        run: |
+          python scripts/daily_papers_email.py --test --timezone "${{ inputs.timezone }}" --subject-prefix "${{ inputs.subject_prefix }}"
+      - name: Send Daily Papers Email
+        env:
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          MAIL_FROM: ${{ secrets.MAIL_FROM }}
+          MAIL_TO: ${{ secrets.MAIL_TO }}
+          TIMEZONE: ${{ env.TIMEZONE }}
+          SUBJECT_PREFIX: ${{ env.SUBJECT_PREFIX }}
+          MAX_DAYS_BACK: ${{ env.MAX_DAYS_BACK }}
+        run: |
+          ARGS=""
+          if [ -n "${{ inputs.date }}" ]; then ARGS="$ARGS --date '${{ inputs.date }}'"; fi
+          if [ -n "${{ inputs.timezone }}" ]; then ARGS="$ARGS --timezone '${{ inputs.timezone }}'"; fi
+          if [ -n "${{ inputs.subject_prefix }}" ]; then ARGS="$ARGS --subject-prefix '${{ inputs.subject_prefix }}'"; fi
+          if [ -n "${{ inputs.max_days_back }}" ]; then ARGS="$ARGS --max-days-back ${{ inputs.max_days_back }}"; fi
+          python scripts/daily_papers_email.py $ARGS
