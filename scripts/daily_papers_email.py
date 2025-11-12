@@ -187,15 +187,16 @@ def main():
     args = parser.parse_args()
 
     if args.test:
-        now = datetime.now(resolve_tz(args.timezone))
-        date_str = now.strftime("%Y-%m-%d %H:%M:%S %Z")
-        subject = f"{args.subject_prefix}服务启动测试 - {date_str}".strip()
-        html = (
-            "<html><body><div style=\"font-family:Arial,Helvetica,sans-serif;max-width:680px;margin:0 auto;\">"
-            f"<h2 style=\"color:#0969da\">服务启动测试</h2><p>时间：{date_str}</p><p>邮件发送链路验证成功。</p>"
-            "</div></body></html>"
-        )
-        text = f"服务启动测试\n时间：{date_str}\n邮件发送链路验证成功。"
+        tz_name = args.timezone
+        if args.date:
+            date_str = args.date
+            papers = fetch_papers_for_date(date_str)
+        else:
+            date_str, papers = get_daily_papers_with_fallback(tz_name, args.max_days_back)
+        subject_core = f"Hugging Face Daily Papers - {date_str}"
+        subject = f"{args.subject_prefix}{subject_core}".strip()
+        html = build_email_html(date_str, papers)
+        text = build_email_text(date_str, papers)
         send_email(subject, html, text)
         return
 
